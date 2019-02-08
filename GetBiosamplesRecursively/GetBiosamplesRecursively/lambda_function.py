@@ -9,7 +9,7 @@ from gremlin_python.driver.driver_remote_connection import DriverRemoteConnectio
 
 max_recursion = int(os.environ.get('MAX_RECURSIVE_DEPTH', '4'))
 
-db = os.environ.get('EDB_DB', "")
+db = os.environ.get('EDB_DB', "wss://gimsnepdbtest.cvkyaz9id4ml.us-east-1.neptune.amazonaws.com:8182")
 bp_queue = os.environ.get('BIOPROJECT_QUEUE', "edb-bioprojects")
 bs_queue = os.environ.get('BIOSAMPLE_QUEUE', 'edb-biosamples')
 api_key = os.environ.get('NCBI_API_KEY', "")
@@ -18,6 +18,7 @@ if api_key:
     print("API key found in environment")
     req = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db={database}&id={accession}&api_key={api_key}"
 else:
+    print("No API key found")
     req = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db={database}&id={accession}"
 
 sqs = boto3.resource("sqs")
@@ -50,7 +51,9 @@ def lambda_handler(event, context):
             #                             api_key=api_key)).text)
             # biosample = bs_record.find('''.//Id[@is_primary="1"]''')
             # bs_dict = {a.attrib['attribute_name']:a.text for a in bs_record.findall('.//Attribute')}
-            if not False: #add DB checking logic
+            graph = Graph()
+            g = graph.traversal().withRemote(DriverRemoteConnection(db, 'g'))
+            if not g.E().has('name', biosample): #add DB checking logic
                 bsq.send_message(MessageBody=json.dumps(dict(biosample=biosample)))
     if recursive_depth < max_recursion:
         for link in (dict(recursive_depth=recursive_depth,
