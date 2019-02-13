@@ -15,15 +15,18 @@ bs_queue = os.environ.get('BIOSAMPLE_QUEUE', 'edb-biosamples')
 api_key = os.environ.get('NCBI_API_KEY', "")
 
 if api_key:
-    print("API key found in environment")
+    print(f"API key found in environment: {api_key}")
     req = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db={database}&id={accession}&api_key={api_key}"
 else:
     print("No API key found")
     req = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db={database}&id={accession}"
 
 sqs = boto3.resource("sqs")
+#print("sqs")
 bpq = sqs.get_queue_by_name(QueueName=bp_queue)
+#print("bpq")
 bsq = sqs.get_queue_by_name(QueueName=bs_queue)
+#print("bsq")
 
 
 def lambda_handler(event, context):
