@@ -9,19 +9,19 @@ from gremlin_python.driver.driver_remote_connection import DriverRemoteConnectio
 
 max_recursion = int(os.environ.get('MAX_RECURSIVE_DEPTH', '4'))
 
-db = os.environ.get('EDB_DB', "wss://gimsnepdbtest.cvkyaz9id4ml.us-east-1.neptune.amazonaws.com:8182")
+db = os.environ.get('EDB_DB', "wss://biosurvdbtest.cvkyaz9id4ml.us-east-1.neptune.amazonaws.com:8182/gremlin")
 bp_queue = os.environ.get('BIOPROJECT_QUEUE', "edb-bioprojects")
 bs_queue = os.environ.get('BIOSAMPLE_QUEUE', 'edb-biosamples')
 api_key = os.environ.get('NCBI_API_KEY', "")
 
 if api_key:
-    print(f"API key found in environment: {api_key}")
+    print("API key found in environment: {api_key}")
     req = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db={database}&id={accession}&api_key={api_key}"
 else:
     print("No API key found")
     req = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db={database}&id={accession}"
 
-sqs = boto3.resource("sqs")
+sqs = boto3.resource("sqs", region_name=os.environ.get("SERVICE_REGION", "us-east-1"))
 #print("sqs")
 bpq = sqs.get_queue_by_name(QueueName=bp_queue)
 #print("bpq")
@@ -55,10 +55,12 @@ def lambda_handler(event, context):
             # biosample = bs_record.find('''.//Id[@is_primary="1"]''')
             # bs_dict = {a.attrib['attribute_name']:a.text for a in bs_record.findall('.//Attribute')}
             graph = Graph()
-            g = graph.traversal().withRemote(DriverRemoteConnection(db, 'g'))
-            if not g.E().has('name', biosample): #add DB checking logic
+            g = graph.traversal().withRemote(DriverRemoteConnection(db, 'g')) ###!!!
+            if not g.E().has('name', biosample): 
+                #add the biosample to the queue
                 bsq.send_message(MessageBody=json.dumps(dict(biosample=biosample)))
     if recursive_depth < max_recursion:
+        #get all of the child bioprojects and dump them in the queue
         for link in (dict(recursive_depth=recursive_depth,
                       bioproject=link.attrib['accession']) 
                       for link in record.findall(".//ProjectLinks/Link/ProjectIDRef")
