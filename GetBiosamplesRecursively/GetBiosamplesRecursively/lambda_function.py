@@ -56,7 +56,7 @@ def lambda_handler(event, context):
             # bs_dict = {a.attrib['attribute_name']:a.text for a in bs_record.findall('.//Attribute')}
             graph = Graph()
             g = graph.traversal().withRemote(DriverRemoteConnection(db, 'g')) ###!!!
-            if not g.E().has('name', biosample): 
+            if not list(g.E().has('NAMED_IN', 'name', biosample)): 
                 #add the biosample to the queue
                 bsq.send_message(MessageBody=json.dumps(dict(biosample=biosample)))
     if recursive_depth < max_recursion:
