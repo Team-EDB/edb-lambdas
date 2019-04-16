@@ -1,4 +1,5 @@
 import boto3
+import json
 import requests
 import os
 from xml.etree import ElementTree as xml
@@ -32,11 +33,7 @@ sample = dict()
 def convert_record(biorecord, taxrecord, g):
     """Convert Biosample record and Taxonomy record into a series of associated
        records that capture taxonomy, sample collection, and a lot of names"""
-    primary_id = ""
-    for id_ in biorecord.findall('.//Ids/Id'):
-        if id_.attrib.get('is_primary'):
-            primary_id = id_.text
-            break
+    primary_id = biorecord.find('./BioSample').attrib['accession']
     #create the sample
     s = ( g.V().has('sample', 'sample_id', primary_id).fold()
           .coalesce(
@@ -123,14 +120,14 @@ def convert_record(biorecord, taxrecord, g):
             .coalesce(
                unfold(),
                addV('metadata::namespace').property('name', namespace)
-            ).V().has('namespace', 'name', namespace)
-             .V(s).as_('s')
+            ).V().has('namespace', 'name', namespace).as_('ns')
+             .V(s)
             .coalesce(
-                __.inE('NAMED_IN').where(outV().as_('s')
+                __.inE('NAMED_IN').where(inV().as_('ns')
                                   .and_()
                                   .values('name').is_(name)),
                   addE('NAMED_IN')
-                    .from_('s')
+                    .to('ns')
                     .property('name', name)
             )
         ).next()
@@ -170,6 +167,8 @@ def lambda_handler(event, context):
     accession = convert_record(record, taxon, g)
     print(accession)
     #loaded a biosample, now put this into the SRA data check queue
-    sraq.send_message(MessageBody=json.dumps(dict(biosample_id=accession)))
+    sraq.send_message(MessageBody=json.dumps(dict(biosample_id=accession,
+                                                  biosample=event['biosample'],
+                                                  bioproject=event.get('bioproject', ""))))
     
     return ''

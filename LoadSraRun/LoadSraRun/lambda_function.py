@@ -26,8 +26,22 @@ else:
 sqs = boto3.resource("sqs", region_name=os.environ.get("SERVICE_REGION", "us-east-1"))
 sraq = sqs.get_queue_by_name(QueueName=sra_capture_queue)
 
-def load_record(record, experiment, biosample, g):
-    pass
+def load_record(run, experiment, biosample, uri, g):
+    "Load run record"
+    exp_accession = experiment.find('.//EXPERIMENT').attrib['accession']
+    run_accession = run.find('./RUN').attrib['accession']
+    sub_accession = experiment.find('.//SUBMISSION').attrib['accession']
+    
+    r = g.V()
+    
+    f = g.V()
+         .coalesce(
+         
+         
+         ).property('crammed', False)
+          
+    
+    return f
 
 
 def lambda_handler(event, context):
@@ -51,10 +65,16 @@ def lambda_handler(event, context):
                              api_key=api_key)).text)
         for run in record.findall('.//RunSet/Run'):
             sra_accession = run.attrib['accession']
-            if not list(g.E().has('NAMED_IN', 'name', sra_accession)):
+            if not list(g.E().hasLabel('NAMED_IN')
+                         .filter(__.properties().values('name').is_(sra_accession))):
                 #this one is new
-                ebd_id = load_record(run, record, biosample, g)
-                sraq.send_message(MessageBody=json.dumps(dict(sra_accession=sra_accession,
-                                                              edb_record_id = edb_id)))
+                uri = f's3://edb/{biosample}/runs/{sra_accession}/'
+                ebd_id = load_record(run, record, biosample, uri, g)
+                sraq.send_message(MessageBody=json.dumps(dict(data=dict(accession=sra_accession,
+                                                                        biosample=event.get('biosample', ''),
+                                                                        bioproject=event.get('bioproject', '')
+                                                                        s3Bucket=uri,
+                                                                        edb_record_id = edb_id)),
+                                                              results=dict()))
             
     return ''

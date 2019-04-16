@@ -6,6 +6,7 @@ from xml.etree import ElementTree as xml
 
 from gremlin_python.structure.graph import Graph
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
+from gremlin_python.process.graph_traversal import __
 
 max_recursion = int(os.environ.get('MAX_RECURSIVE_DEPTH', '4'))
 
@@ -44,7 +45,6 @@ def lambda_handler(event, context):
     for tag in record.findall('.//LocusTagPrefix'):
         try:
             biosample = tag.attrib['biosample_id']
-            print(biosample)
         except KeyError:
             pass
         else:
@@ -56,9 +56,12 @@ def lambda_handler(event, context):
             # bs_dict = {a.attrib['attribute_name']:a.text for a in bs_record.findall('.//Attribute')}
             graph = Graph()
             g = graph.traversal().withRemote(DriverRemoteConnection(db, 'g')) ###!!!
-            if not list(g.E().has('NAMED_IN', 'name', biosample)): 
+            if not list(g.E().hasLabel('NAMED_IN')
+                         .filter(__.properties().values('name').is_(biosample))):
                 #add the biosample to the queue
-                bsq.send_message(MessageBody=json.dumps(dict(biosample=biosample)))
+                bsq.send_message(MessageBody=json.dumps(dict(biosample=biosample,
+                                                             bioproject=event['bioproject'])))
+                print(biosample)
     if recursive_depth < max_recursion:
         #get all of the child bioprojects and dump them in the queue
         for link in (dict(recursive_depth=recursive_depth,
